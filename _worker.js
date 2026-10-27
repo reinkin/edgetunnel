@@ -1,4 +1,4 @@
-﻿const Version = '2026-10-08 22:23:27';
+const Version = '2026-10-08 22:23:27';
 let config_JSON, 缓存SOCKS5白名单 = null, 调试日志打印 = false;
 let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
 const Pages静态页面 = 'https://edt-pages.github.io', EDT_版本号 = Number(String(Version).replace(/\D+/g, ''));
@@ -25,6 +25,41 @@ export default {
 			请求URL文本 = 请求URL主体部分.replace(/%3f/i, '?') + 请求URL锚点部分;
 		}
 		const url = new URL(请求URL文本);
+		// ------------------ [Antigravity] 私有安全订阅分发端点 ------------------
+		if (url.pathname === '/api/sub' || url.pathname === '/c/sub') {
+			const SUB_TOKEN = env.SUB_TOKEN || "cfsub_sec_367df1b345f04100";
+			const reqToken = url.searchParams.get('token');
+			if (!reqToken || reqToken !== SUB_TOKEN) {
+				return new Response('Not Found', { status: 404 });
+			}
+			if (request.method === 'POST') {
+				if (!env.KV) return new Response('KV not bound', { status: 500 });
+				const yamlContent = await request.text();
+				if (!yamlContent || yamlContent.length < 100) {
+					return new Response('Invalid payload', { status: 400 });
+				}
+				await env.KV.put('RAW_CLASH_CONFIG', yamlContent);
+				return new Response(JSON.stringify({ success: true, size: yamlContent.length, timestamp: new Date().toISOString() }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				});
+			} else if (request.method === 'GET') {
+				if (!env.KV) return new Response('KV not bound', { status: 500 });
+				const sub = await env.KV.get('RAW_CLASH_CONFIG');
+				if (!sub) return new Response('Subscription not generated yet', { status: 404 });
+				return new Response(sub, {
+					status: 200,
+					headers: {
+						'Content-Type': 'text/yaml; charset=utf-8',
+						'Content-Disposition': 'attachment; filename*=UTF-8\'\'clash.yaml',
+						'Cache-Control': 'no-cache, no-store, must-revalidate',
+						'profile-update-interval': '6'
+					}
+				});
+			}
+			return new Response('Method Not Allowed', { status: 405 });
+		}
+		// ------------------------------------------------------------------------
 		const UA = request.headers.get('User-Agent') || 'null';
 		const upgradeHeader = (request.headers.get('Upgrade') || '').toLowerCase(), contentType = (request.headers.get('content-type') || '').toLowerCase();
 		const 管理员密码 = env.ADMIN || env.admin || env.PASSWORD || env.password || env.pswd || env.TOKEN || env.KEY || env.UUID || env.uuid;
